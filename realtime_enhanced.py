@@ -4,7 +4,7 @@ Incorporates concepts from Lab2 multicast exercises for efficient broadcasting
 """
 
 from flask_socketio import emit, disconnect
-from database import get_all_trains
+from database_enhanced import get_all_trains_enhanced
 import socket
 import struct
 import threading
@@ -48,7 +48,7 @@ def init_realtime(socketio):
         
         # Send initial train positions with error handling
         try:
-            trains = get_all_trains()
+            trains = get_all_trains_enhanced()
             emit('initial_trains', trains)
             emit('status', {
                 'msg': 'Connected to Enhanced Real-Time KL Metro Tracking System', 
@@ -74,7 +74,7 @@ def init_realtime(socketio):
     def handle_request_trains():
         """Handle client request for current train positions with validation"""
         try:
-            trains = get_all_trains()
+            trains = get_all_trains_enhanced()
             emit('trains_data', {
                 'trains': trains,
                 'timestamp': time.time(),
@@ -97,7 +97,7 @@ def init_realtime(socketio):
             print(f"Client {client_id} subscribed to zone: {zone}")
             
             # Filter trains by zone/line if specified
-            trains = get_all_trains()
+            trains = get_all_trains_enhanced()
             if zone != 'all':
                 # This would be enhanced with actual line/zone data
                 filtered_trains = [t for t in trains if zone.lower() in str(t.get('line', '')).lower()]

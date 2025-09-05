@@ -16,27 +16,11 @@ app.config['SECRET_KEY'] = 'your-secret-key-here-change-in-production'
 # Initialize SocketIO with threading mode for Windows compatibility
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading', logger=False, engineio_logger=False)
 
-# Import enhanced modules after app initialization to avoid circular imports
-try:
-    # Try enhanced modules first
-    from database_enhanced import init_db, get_db_connection
-    from realtime_enhanced import init_realtime
-    from data_generator_enhanced import start_data_generator
-    print("Using enhanced modules with multicast support and advanced features")
-except ImportError as e:
-    print(f"Enhanced modules not available ({e}), trying simple modules...")
-    try:
-        # Try simple modules
-        from database_simple import init_db, get_db_connection
-        from realtime import init_realtime
-        from data_generator import start_data_generator
-        print("Using simple database with basic modules")
-    except ImportError:
-        # Fallback to basic modules
-        from database import init_db, get_db_connection
-        from realtime import init_realtime
-        from data_generator import start_data_generator
-        print("Using basic modules (enhanced modules not available)")
+# Import enhanced modules
+from database_enhanced import init_db, get_db_connection
+from realtime_enhanced import init_realtime
+from data_generator_enhanced import start_data_generator
+print("Using enhanced modules with multicast support and advanced features")
 
 from routes import init_routes
 
