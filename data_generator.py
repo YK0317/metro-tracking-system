@@ -1,21 +1,18 @@
 """
-Enhanced Data Generator with Threading and Multicast Support
-Incorporates concepts from practical exercises for better performance and reliability
+Data Generator for KL Metro System
+Implements train simulation with line-based movement
 """
 
 import time
 import random
 import threading
-import json
-import pickle
 from queue import Queue
 from database_enhanced import get_db_connection, get_all_stations, update_train_position_enhanced
 from realtime_enhanced import broadcast_train_update_enhanced, broadcast_system_alert
+from train_movement import TrainMovement
 
-class EnhancedTrainSimulator:
-    """
-    Enhanced train simulator with threading support (inspired by Lab2/RPyC threading concepts)
-    """
+class TrainSimulator:
+    """Train simulator with line-based movement"""
     
     def __init__(self, socketio):
         self.socketio = socketio
@@ -24,12 +21,13 @@ class EnhancedTrainSimulator:
         self.update_queue = Queue()
         self.worker_threads = []
         self.train_states = {}
-        self.update_interval = (3, 7)  # Random interval range
+        self.update_interval = (4, 8)  # Realistic movement intervals
+        self.train_movement = TrainMovement()  # Initialize movement system
         
     def initialize_simulation(self):
-        """Initialize simulation with error handling and validation"""
+        """Initialize simulation with stations and trains"""
         try:
-            print("Initializing Enhanced Train Simulation...")
+            print("Initializing Train Simulation...")
             
             # Load stations
             self.stations = get_all_stations()
@@ -39,10 +37,10 @@ class EnhancedTrainSimulator:
             # Initialize train states
             self.init_train_states()
             
-            # Start worker threads (concept from threading examples)
+            # Start worker threads
             self.start_worker_threads()
             
-            print(f"Enhanced simulation initialized with {len(self.stations)} stations and {len(self.train_states)} trains")
+            print(f"Simulation initialized with {len(self.stations)} stations and {len(self.train_states)} trains")
             return True
             
         except Exception as e:
@@ -50,7 +48,7 @@ class EnhancedTrainSimulator:
             return False
     
     def init_train_states(self):
-        """Initialize train positions with validation"""
+        """Initialize train positions"""
         print("Initializing train states...")
         try:
             with get_db_connection() as conn:
@@ -61,44 +59,18 @@ class EnhancedTrainSimulator:
                 conn.execute('DELETE FROM trains')
                 print("Existing trains cleared")
                 
-                # Add enhanced train fleet
-                initial_trains = [
-                    (1, 1, 3.1348, 101.6868, 'LRT Kelana Jaya'),
-                    (2, 3, 3.1578, 101.7122, 'LRT Kelana Jaya'),
-                    (3, 10, 3.1486, 101.7617, 'LRT Ampang'),
-                    (4, 15, 3.1258, 101.6858, 'LRT Ampang'),
-                    (5, 5, 3.1735, 101.7258, 'LRT Ampang'),
-                    (6, 11, 3.1471, 101.7000, 'LRT Kelana Jaya'),
-                ]
+                # Train data will be loaded from external configuration or user input
+                print("Train initialization skipped - trains will be added dynamically")
                 
                 print("Adding line column if needed...")
-                # Enhanced train table with line information - add column safely
+                # Add line column to trains table safely
                 try:
-                    # Try to add the column, ignore if it already exists
                     conn.execute('ALTER TABLE trains ADD COLUMN line TEXT DEFAULT "Unknown"')
                     print("Added 'line' column to trains table")
                 except Exception as e:
-                    # Column probably already exists, which is fine
+                    # Column probably already exists
                     print(f"Column 'line' handling: {e}")
                     pass
-                
-                print("Inserting train data...")
-                for i, train_data in enumerate(initial_trains):
-                    print(f"Processing train {i+1}/{len(initial_trains)}")
-                    train_id, station_id, lat, lng, line = train_data
-                    conn.execute('''
-                        INSERT INTO trains (train_id, current_station_id, latitude, longitude, line)
-                        VALUES (?, ?, ?, ?, ?)
-                    ''', (train_id, station_id, lat, lng, line))
-                    
-                    # Store in memory for quick access
-                    self.train_states[train_id] = {
-                        'current_station_id': station_id,
-                        'line': line,
-                        'last_update': time.time(),
-                        'direction': 'forward',
-                        'speed_factor': random.uniform(0.8, 1.2)
-                    }
                 
                 print("Committing changes...")
                 conn.commit()
@@ -107,16 +79,6 @@ class EnhancedTrainSimulator:
         except Exception as e:
             print(f"Error initializing train states: {e}")
             raise
-    
-    def column_exists(self, conn, table_name, column_name):
-        """Check if column exists in table - simplified version"""
-        try:
-            cursor = conn.execute(f"PRAGMA table_info({table_name})")
-            columns = [row[1] for row in cursor.fetchall()]
-            return column_name in columns
-        except Exception as e:
-            print(f"Error checking column existence: {e}")
-            return False
     
     def start_worker_threads(self):
         """Start background worker threads for simulation"""
@@ -130,20 +92,20 @@ class EnhancedTrainSimulator:
         processor_thread.start()
         self.worker_threads.append(processor_thread)
         
-        # System monitor thread (inspired by monitoring concepts)
+        # System monitor thread
         monitor_thread = threading.Thread(target=self.system_monitor, daemon=True)
         monitor_thread.start()
         self.worker_threads.append(monitor_thread)
     
     def simulation_loop(self):
-        """Main simulation loop with enhanced error handling"""
+        """Main simulation loop"""
         self.simulation_running = True
         iteration_count = 0
         
         while self.simulation_running:
             try:
                 iteration_count += 1
-                print(f"\n--- Enhanced Simulation Iteration {iteration_count} ---")
+                print(f"\n--- Simulation Iteration {iteration_count} ---")
                 
                 # Process each train
                 for train_id in list(self.train_states.keys()):
@@ -153,7 +115,7 @@ class EnhancedTrainSimulator:
                         print(f"Error simulating train {train_id}: {e}")
                         continue
                 
-                # Occasional system events (inspired by alert system)
+                # Occasional system events
                 if iteration_count % 20 == 0:  # Every 20 iterations
                     self.generate_system_event()
                 
@@ -164,92 +126,30 @@ class EnhancedTrainSimulator:
                 
             except Exception as e:
                 print(f"Critical error in simulation loop: {e}")
-                time.sleep(10)  # Longer sleep on critical errors
+                time.sleep(10)
     
     def simulate_single_train(self, train_id):
-        """Enhanced single train simulation with intelligent movement"""
-        train_state = self.train_states[train_id]
-        current_station_id = train_state['current_station_id']
-        line = train_state['line']
-        
-        # Get connected stations based on line and fare data
-        connected_stations = self.get_connected_stations(current_station_id, line)
-        
-        if not connected_stations:
-            # Fallback to random movement
-            available_stations = [s for s in self.stations if s['station_id'] != current_station_id]
-            if available_stations:
-                new_station = random.choice(available_stations)
-            else:
-                return
-        else:
-            # Intelligent movement based on direction and line
-            new_station = self.choose_next_station(train_id, connected_stations)
-        
-        if new_station:
-            # Update database with enhanced function
-            update_train_position_enhanced(
-                train_id,
-                new_station['station_id'],
-                new_station['latitude'],
-                new_station['longitude'],
-                random.randint(-10, 20)  # Random passenger change
-            )
-            
-            # Update local state
-            train_state['current_station_id'] = new_station['station_id']
-            train_state['last_update'] = time.time()
-            
-            # Queue update for broadcast
-            update_data = {
-                'train_id': train_id,
-                'station_id': new_station['station_id'],
-                'station_name': new_station['name'],
-                'latitude': new_station['latitude'],
-                'longitude': new_station['longitude'],
-                'timestamp': time.time(),
-                'previous_station_id': current_station_id,
-                'line': line,
-                'speed_factor': train_state['speed_factor']
-            }
-            
-            self.update_queue.put(update_data)
-    
-    def get_connected_stations(self, station_id, line):
-        """Get stations connected to current station on the same line"""
+        """Simulate single train movement using line-based movement"""
         try:
-            with get_db_connection() as conn:
-                # Get directly connected stations from fare table
-                connected = conn.execute('''
-                    SELECT DISTINCT s.station_id, s.name, s.latitude, s.longitude
-                    FROM fares f
-                    JOIN stations s ON (f.destination_id = s.station_id OR f.origin_id = s.station_id)
-                    WHERE (f.origin_id = ? OR f.destination_id = ?) AND s.station_id != ?
-                ''', (station_id, station_id, station_id)).fetchall()
+            # Use train movement system
+            movement_result = self.train_movement.move_train(train_id)
+            
+            if movement_result:
+                # Update local state
+                if train_id in self.train_states:
+                    self.train_states[train_id]['current_station_id'] = movement_result['station_id']
+                    self.train_states[train_id]['last_update'] = time.time()
                 
-                return [dict(station) for station in connected]
+                # Queue update for broadcast
+                self.update_queue.put(movement_result)
+                
+                print(f"🚊 Train {train_id}: {movement_result['station_name']} ({movement_result['direction']}) "
+                      f"on {movement_result['line']}")
+            else:
+                print(f"⚠️  Train {train_id} movement failed - skipping this cycle")
+                
         except Exception as e:
-            print(f"Error getting connected stations: {e}")
-            return []
-    
-    def choose_next_station(self, train_id, connected_stations):
-        """Intelligent station selection based on train direction and patterns"""
-        train_state = self.train_states[train_id]
-        
-        if not connected_stations:
-            return None
-        
-        # Simple direction-based logic (can be enhanced)
-        if len(connected_stations) == 1:
-            return connected_stations[0]
-        
-        # For multiple options, add some intelligence
-        if train_state['direction'] == 'forward':
-            # Prefer stations with higher IDs
-            return max(connected_stations, key=lambda s: s['station_id'])
-        else:
-            # Prefer stations with lower IDs
-            return min(connected_stations, key=lambda s: s['station_id'])
+            print(f"❌ Error in train {train_id} simulation: {e}")
     
     def process_updates(self):
         """Process queued updates for broadcasting"""
@@ -258,7 +158,7 @@ class EnhancedTrainSimulator:
                 if not self.update_queue.empty():
                     update_data = self.update_queue.get()
                     
-                    # Broadcast using enhanced method
+                    # Broadcast update
                     broadcast_train_update_enhanced(self.socketio, update_data)
                     
                     # Mark task as done
@@ -271,7 +171,7 @@ class EnhancedTrainSimulator:
                 time.sleep(1)
     
     def system_monitor(self):
-        """System monitoring thread (inspired by monitoring examples)"""
+        """System monitoring thread"""
         while True:
             try:
                 # Monitor simulation health
@@ -297,7 +197,7 @@ class EnhancedTrainSimulator:
                 time.sleep(60)
     
     def generate_system_event(self):
-        """Generate occasional system events for realism"""
+        """Generate occasional system events"""
         events = [
             {'type': 'MAINTENANCE', 'message': 'Scheduled maintenance completed', 'severity': 1},
             {'type': 'TRAFFIC', 'message': 'Minor delay on LRT Ampang line', 'severity': 2},
@@ -309,16 +209,16 @@ class EnhancedTrainSimulator:
     
     def stop_simulation(self):
         """Stop the simulation gracefully"""
-        print("Stopping enhanced simulation...")
+        print("Stopping simulation...")
         self.simulation_running = False
         
         # Wait for queue to empty
         self.update_queue.join()
         
-        print("Enhanced simulation stopped")
+        print("Simulation stopped")
     
     def get_simulation_stats(self):
-        """Get detailed simulation statistics"""
+        """Get simulation statistics"""
         return {
             'active_trains': len(self.train_states),
             'stations_count': len(self.stations),
@@ -332,29 +232,26 @@ class EnhancedTrainSimulator:
 _simulator_instance = None
 
 def start_data_generator(socketio):
-    """
-    Enhanced data generator startup function
-    """
+    """Start the data generator"""
     global _simulator_instance
     
-    print("Starting Enhanced Data Generator...")
+    print("Starting Data Generator...")
     
     # Create simulator instance
-    _simulator_instance = EnhancedTrainSimulator(socketio)
+    _simulator_instance = TrainSimulator(socketio)
     
     # Initialize and start simulation
     if _simulator_instance.initialize_simulation():
-        print("Enhanced data generator started successfully!")
+        print("Data generator started successfully!")
     else:
-        print("Failed to start enhanced data generator")
+        print("Failed to start data generator")
 
 def get_simulator_instance():
-    """Get the current simulator instance for external access"""
+    """Get the current simulator instance"""
     return _simulator_instance
 
-# Backward compatibility functions
 def add_train_to_simulation(train_id, initial_station_id):
-    """Enhanced train addition with validation"""
+    """Add train to simulation"""
     if _simulator_instance:
         try:
             stations = _simulator_instance.stations
@@ -378,7 +275,7 @@ def add_train_to_simulation(train_id, initial_station_id):
                     'speed_factor': random.uniform(0.8, 1.2)
                 }
                 
-                print(f"Enhanced: Added Train {train_id} at Station {initial_station_id}")
+                print(f"Added Train {train_id} at Station {initial_station_id}")
                 return True
             else:
                 print(f"Invalid station {initial_station_id} for new train")
@@ -391,7 +288,7 @@ def add_train_to_simulation(train_id, initial_station_id):
     return False
 
 def remove_train_from_simulation(train_id):
-    """Enhanced train removal with cleanup"""
+    """Remove train from simulation"""
     if _simulator_instance:
         try:
             with get_db_connection() as conn:
@@ -403,7 +300,7 @@ def remove_train_from_simulation(train_id):
                     if train_id in _simulator_instance.train_states:
                         del _simulator_instance.train_states[train_id]
                     
-                    print(f"Enhanced: Removed Train {train_id} from simulation")
+                    print(f"Removed Train {train_id} from simulation")
                     return True
                 else:
                     print(f"Train {train_id} not found in simulation")
@@ -416,7 +313,7 @@ def remove_train_from_simulation(train_id):
     return False
 
 def get_simulation_stats():
-    """Get enhanced simulation statistics"""
+    """Get simulation statistics"""
     if _simulator_instance:
         return _simulator_instance.get_simulation_stats()
     else:

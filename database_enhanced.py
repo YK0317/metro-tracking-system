@@ -75,7 +75,7 @@ class DatabaseConnectionPool:
             return self.connections.get(timeout=5)
             
         except:
-            # Fallback: create temporary connection
+            # Create temporary connection if pool is exhausted
             return self._create_connection()
     
     def return_connection(self, conn):
@@ -259,7 +259,7 @@ def init_db():
                 
                 print("Loading CSV data...")
                 # Load CSV data if tables are empty
-                load_enhanced_csv_data(conn)
+                load_csv_data(conn)
                 
             except Exception as e:
                 print(f"Error during database initialization: {e}")
@@ -291,9 +291,9 @@ def create_indexes(conn):
         except Exception as e:
             print(f"Warning: Could not create index: {e}")
 
-def load_enhanced_csv_data(conn):
-    """Load enhanced station and fare data with validation"""
-    print("Loading enhanced CSV data...")
+def load_csv_data(conn):
+    """Load station and fare data from external sources"""
+    print("Checking for existing data...")
     
     try:
         # Check if data already exists
@@ -302,118 +302,17 @@ def load_enhanced_csv_data(conn):
         print(f"Found {stations_count} existing stations")
         
         if stations_count == 0:
-            print("Loading enhanced station data...")
+            print("No station data loaded - database will be populated from CSV files or external data sources")
             
-            # Enhanced KL Metro stations with additional metadata
-            enhanced_stations = [
-                (1, 'KL Sentral', 3.1348, 101.6868, 'LRT Kelana Jaya', 'Central', 1),
-                (2, 'Masjid Jamek', 3.1488, 101.6942, 'LRT Kelana Jaya', 'Central', 1),
-                (3, 'KLCC', 3.1578, 101.7122, 'LRT Kelana Jaya', 'Central', 1),
-                (4, 'Ampang Park', 3.1592, 101.7167, 'LRT Ampang', 'Central', 1),
-                (5, 'Damai', 3.1735, 101.7258, 'LRT Ampang', 'North', 1),
-                (6, 'Jelatek', 3.1798, 101.7342, 'LRT Ampang', 'North', 1),
-                (7, 'Setiawangsa', 3.1842, 101.7425, 'LRT Ampang', 'North', 1),
-                (8, 'Wangsa Maju', 3.1886, 101.7508, 'LRT Ampang', 'North', 1),
-                (9, 'Sri Rampai', 3.1930, 101.7591, 'LRT Ampang', 'North', 1),
-                (10, 'Ampang', 3.1486, 101.7617, 'LRT Ampang', 'East', 1),
-                (11, 'Dang Wangi', 3.1471, 101.7000, 'LRT Kelana Jaya', 'Central', 1),
-                (12, 'Plaza Rakyat', 3.1425, 101.6958, 'LRT Ampang', 'Central', 1),
-                (13, 'Hang Tuah', 3.1383, 101.6925, 'LRT Ampang', 'Central', 1),
-                (14, 'Pudu', 3.1333, 101.6892, 'LRT Ampang', 'Central', 1),
-                (15, 'Chan Sow Lin', 3.1258, 101.6858, 'LRT Ampang', 'South', 1),
-                (16, 'Miharja', 3.1200, 101.6825, 'LRT Ampang', 'South', 1),
-                (17, 'Maluri', 3.1142, 101.6792, 'LRT Ampang', 'South', 1),
-                (18, 'Pandan Indah', 3.1058, 101.6725, 'LRT Ampang', 'South', 1),
-                (19, 'Pandan Jaya', 3.0975, 101.6658, 'LRT Ampang', 'South', 1),
-                (20, 'Cempaka', 3.0892, 101.6592, 'LRT Ampang', 'South', 1),
-            ]
-            
-            conn.executemany('''
-                INSERT INTO stations (station_id, name, latitude, longitude, line, zone, operational)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', enhanced_stations)
-            
-            print("Loading enhanced fare data...")
-            
-            # Enhanced fare matrix with peak pricing and metadata
-            enhanced_fares = []
-            base_fares = [
-                # From KL Sentral
-                (1, 2, 2.50, 2.80, 3.2, 8), (1, 11, 2.10, 2.40, 2.8, 6), (1, 13, 2.80, 3.10, 4.1, 12),
-                # From Masjid Jamek  
-                (2, 1, 2.50, 2.80, 3.2, 8), (2, 3, 2.80, 3.10, 3.8, 10), (2, 11, 1.50, 1.70, 2.1, 5),
-                (2, 12, 1.80, 2.00, 2.5, 6),
-                # From KLCC
-                (3, 2, 2.80, 3.10, 3.8, 10), (3, 4, 1.50, 1.70, 2.0, 4), (3, 11, 3.20, 3.50, 4.2, 12),
-                # Continue building comprehensive fare matrix...
-                (4, 3, 1.50, 1.70, 2.0, 4), (4, 5, 1.80, 2.00, 2.3, 5), (4, 10, 2.10, 2.30, 2.8, 7),
-                (5, 4, 1.80, 2.00, 2.3, 5), (5, 6, 1.50, 1.70, 1.8, 4), (5, 9, 2.10, 2.30, 2.6, 6),
-                (6, 5, 1.50, 1.70, 1.8, 4), (6, 7, 1.50, 1.70, 1.9, 4), (6, 8, 1.80, 2.00, 2.2, 5),
-                (7, 6, 1.50, 1.70, 1.9, 4), (7, 8, 1.50, 1.70, 1.8, 4), (7, 9, 1.80, 2.00, 2.1, 5),
-                (8, 6, 1.80, 2.00, 2.2, 5), (8, 7, 1.50, 1.70, 1.8, 4), (8, 9, 1.50, 1.70, 1.7, 4),
-                (8, 10, 2.10, 2.30, 2.5, 6),
-                (9, 5, 2.10, 2.30, 2.6, 6), (9, 7, 1.80, 2.00, 2.1, 5), (9, 8, 1.50, 1.70, 1.7, 4),
-                (9, 10, 1.80, 2.00, 2.2, 5),
-                (10, 4, 2.10, 2.30, 2.8, 7), (10, 8, 2.10, 2.30, 2.5, 6), (10, 9, 1.80, 2.00, 2.2, 5),
-                # Cross-connections
-                (11, 1, 2.10, 2.40, 2.8, 6), (11, 2, 1.50, 1.70, 2.1, 5), (11, 3, 3.20, 3.50, 4.2, 12),
-                (11, 12, 1.50, 1.70, 2.0, 5),
-                (12, 2, 1.80, 2.00, 2.5, 6), (12, 11, 1.50, 1.70, 2.0, 5), (12, 13, 1.50, 1.70, 1.8, 4),
-                (13, 1, 2.80, 3.10, 4.1, 12), (13, 12, 1.50, 1.70, 1.8, 4), (13, 14, 1.50, 1.70, 1.9, 4),
-                (14, 13, 1.50, 1.70, 1.9, 4), (14, 15, 1.50, 1.70, 1.8, 4),
-                (15, 14, 1.50, 1.70, 1.8, 4), (15, 16, 1.50, 1.70, 1.7, 4),
-                (16, 15, 1.50, 1.70, 1.7, 4), (16, 17, 1.50, 1.70, 1.6, 4),
-                (17, 16, 1.50, 1.70, 1.6, 4), (17, 18, 1.50, 1.70, 1.8, 4),
-                (18, 17, 1.50, 1.70, 1.8, 4), (18, 19, 1.50, 1.70, 1.7, 4),
-                (19, 18, 1.50, 1.70, 1.7, 4), (19, 20, 1.50, 1.70, 1.6, 4),
-                (20, 19, 1.50, 1.70, 1.6, 4),
-            ]
-            
-            # Convert to enhanced fare format
-            for origin, dest, price, peak_price, distance, travel_time in base_fares:
-                enhanced_fares.append((origin, dest, price, peak_price, distance, travel_time, 'standard'))
-            
-            conn.executemany('''
-                INSERT INTO fares (origin_id, destination_id, price, peak_price, distance_km, travel_time_min, fare_type)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', enhanced_fares)
-            
-            # Initialize enhanced train fleet
-            print("Initializing enhanced train fleet...")
-            enhanced_trains = [
-                (1, 1, 3.1348, 101.6868, 'LRT Kelana Jaya', 'forward', 300, 85, 45, 'active'),
-                (2, 3, 3.1578, 101.7122, 'LRT Kelana Jaya', 'forward', 300, 120, 42, 'active'),
-                (3, 10, 3.1486, 101.7617, 'LRT Ampang', 'backward', 280, 95, 48, 'active'),
-                (4, 15, 3.1258, 101.6858, 'LRT Ampang', 'forward', 280, 110, 46, 'active'),
-                (5, 5, 3.1735, 101.7258, 'LRT Ampang', 'forward', 280, 75, 44, 'active'),
-                (6, 11, 3.1471, 101.7000, 'LRT Kelana Jaya', 'backward', 300, 140, 43, 'active'),
-                (7, 20, 3.0892, 101.6592, 'LRT Ampang', 'backward', 280, 60, 47, 'active'),
-                (8, 7, 3.1842, 101.7425, 'LRT Ampang', 'forward', 280, 105, 45, 'active'),
-            ]
-            
-            conn.executemany('''
-                INSERT INTO trains (train_id, current_station_id, latitude, longitude, line, direction, capacity, current_load, speed_kmh, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', enhanced_trains)
-            
-            # Add initial system events
-            initial_events = [
-                ('SYSTEM_START', 'Enhanced Metro Tracking System initialized', 1, 'All', 'All', 'active'),
-                ('INFO', 'All lines operating normally', 1, 'LRT Kelana Jaya,LRT Ampang', '', 'active'),
-            ]
-            
-            conn.executemany('''
-                INSERT INTO system_events (event_type, message, severity, affected_lines, affected_stations, status)
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', initial_events)
+            print("Fare data will be loaded from CSV files or external data sources")
             
             conn.commit()
-            print("Enhanced CSV data loaded successfully!")
+            print("Database structure created successfully!")
             
             # Print summary
             print_database_summary(conn)
         else:
-            print("Enhanced database already contains data, skipping CSV load.")
+            print("Database already contains data, skipping initialization.")
             
     except Exception as e:
         print(f"Error loading CSV data: {e}")
@@ -424,7 +323,7 @@ def print_database_summary(conn):
     tables = ['stations', 'fares', 'trains', 'train_movements', 'system_events', 'user_sessions']
     
     print("\n" + "="*50)
-    print("ENHANCED DATABASE SUMMARY")
+    print("DATABASE SUMMARY")
     print("="*50)
     
     for table in tables:
