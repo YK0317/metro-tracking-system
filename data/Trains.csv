@@ -1,0 +1,16 @@
+train_id,train_type,initial_station_id,line,max_speed,initial_passengers,status
+1,Express Service,62,SBK,60.0,81,active
+2,Local Service,20,KJL,45.0,142,active
+3,Express Service,54,SBK,65.0,112,active
+4,MRT Express,41,SBK,80.0,99,active
+5,MRT Local,40,SBK,55.0,98,active
+6,MRT Express,20,SBK,75.0,129,active
+7,Regular Service,61,SBK,50.0,56,active
+8,Regular Service,38,SBK,60.0,117,active
+9,Peak Service,57,SBK,70.0,51,active
+10,Peak Service,54,SBK,65.0,126,active
+11,Express Service,15,KJL,55.0,89,active
+12,Local Service,25,KJL,50.0,134,active
+13,Regular Service,35,KJL,60.0,78,active
+14,Peak Service,5,KJL,65.0,92,active
+15,Express Service,45,SBK,70.0,105,active

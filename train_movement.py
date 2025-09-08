@@ -17,7 +17,7 @@ class TrainMovement:
     def get_line_sequences(self):
         """Define actual KL Metro line sequences based on real topology"""
         return {
-            'LRT Kelana Jaya': [
+            'KJL': [
                 "Gombak", "Taman Melati", "Wangsa Maju", "Sri Rampai", 
                 "Setiawangsa", "Jelatek", "Dato' Keramat", "Damai",
                 "Ampang Park", "KLCC", "Kampung Baru", "Dang Wangi",
@@ -29,18 +29,14 @@ class TrainMovement:
                 "Wawasan", "USJ 21", "Alam Megah", "Subang Alam", "Putra Heights (KJL)"
             ],
             
-            'LRT Ampang': [
+            'SBK': [
                 "Sungai Buloh", "Kampung Selamat", "Kwasa Damansara", "Kwasa Sentral",
                 "Kota Damansara", "Surian", "Mutiara Damansara", "Bandar Utama",
                 "TTDI", "Phileo Damansara", "Pusat Bandar Damansara", "Semantan",
-                "Muzium Negara"
-            ],
-            
-            'MRT SBK': [
-                "Pasar Seni (SBK)", "Merdeka", "Bukit Bintang", "Tun Razak Exchange (TRX)",
-                "Cochrane", "Maluri (SBK)", "Taman Pertama", "Taman Midah",
-                "Taman Mutiara", "Taman Connaught", "Taman Suntex", "Sri Raya",
-                "Bandar Tun Hussein Onn", "Batu 11 Cheras", "Bukit Dukung",
+                "Muzium Negara", "Pasar Seni (SBK)", "Merdeka", "Bukit Bintang", 
+                "Tun Razak Exchange (TRX)", "Cochrane", "Maluri (SBK)", "Taman Pertama", 
+                "Taman Midah", "Taman Mutiara", "Taman Connaught", "Taman Suntex", 
+                "Sri Raya", "Bandar Tun Hussein Onn", "Batu 11 Cheras", "Bukit Dukung",
                 "Sungai Jernih", "Stadium Kajang", "Kajang"
             ]
         }

@@ -54,13 +54,18 @@ class TrainSimulator:
             with get_db_connection() as conn:
                 print("Connected to database for train initialization")
                 
-                # Clear existing trains
-                print("Clearing existing trains...")
-                conn.execute('DELETE FROM trains')
-                print("Existing trains cleared")
+                # Load existing trains from database instead of clearing them
+                existing_trains = conn.execute('SELECT train_id, current_station_id FROM trains').fetchall()
+                print(f"Found {len(existing_trains)} existing trains in database")
                 
-                # Train data will be loaded from external configuration or user input
-                print("Train initialization skipped - trains will be added dynamically")
+                # Initialize train states for existing trains
+                for train_id, station_id in existing_trains:
+                    self.train_states[train_id] = {
+                        'current_station_id': station_id,
+                        'last_update': time.time(),
+                        'active': True
+                    }
+                    print(f"Initialized train {train_id} at station {station_id}")
                 
                 print("Adding line column if needed...")
                 # Add line column to trains table safely
@@ -74,7 +79,7 @@ class TrainSimulator:
                 
                 print("Committing changes...")
                 conn.commit()
-                print("Train states initialized successfully")
+                print(f"Train states initialized successfully with {len(self.train_states)} trains")
                 
         except Exception as e:
             print(f"Error initializing train states: {e}")
