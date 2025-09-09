@@ -15,6 +15,15 @@ from collections import deque, defaultdict
 import heapq
 import time
 
+# Import enhanced route planner
+try:
+    from route_planner_enhanced import get_enhanced_route
+    enhanced_routing = True
+    print("✅ Enhanced route planner loaded (using Route.csv data)")
+except ImportError:
+    enhanced_routing = False
+    print("⚠️  Enhanced route planner not available, using basic routing")
+
 def init_routes(app):
     """Initialize all HTTP API routes"""
     
@@ -96,8 +105,27 @@ def init_routes(app):
             return jsonify({'path': [from_id], 'total_fare': 0.0, 'total_hops': 0})
         
         try:
-            route_result = find_shortest_route(from_id, to_id)
-            return jsonify(route_result)
+            # Use enhanced route planner if available
+            if enhanced_routing:
+                route_result = get_enhanced_route(from_id, to_id)
+                
+                # Format for compatibility with existing frontend
+                if 'error' not in route_result:
+                    # Ensure required fields are present
+                    if 'path' not in route_result and 'path_ids' in route_result:
+                        route_result['path'] = route_result['path_ids']
+                    
+                    if 'total_fare' not in route_result:
+                        route_result['total_fare'] = 0.0
+                    
+                    if 'total_hops' not in route_result:
+                        route_result['total_hops'] = len(route_result.get('path', [])) - 1
+                
+                return jsonify(route_result)
+            else:
+                # Fallback to basic route planner
+                route_result = find_shortest_route(from_id, to_id)
+                return jsonify(route_result)
             
         except Exception as e:
             return jsonify({'error': f'Failed to calculate route: {str(e)}'}), 500

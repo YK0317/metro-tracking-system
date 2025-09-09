@@ -1,11 +1,13 @@
 """
 Train Movement Logic for KL Metro System
-Implements realistic line-based sequential movement
+Implements realistic line-based sequential movement with Time.csv data
 """
 
 from database_enhanced import get_db_connection, update_train_position_enhanced
 import random
 import time
+import csv
+import os
 
 class TrainMovement:
     """Handles realistic train movement along KL Metro lines"""
@@ -13,6 +15,45 @@ class TrainMovement:
     def __init__(self):
         self.line_sequences = self.get_line_sequences()
         self.train_states = {}
+        self.time_matrix = self.load_time_matrix()
+        
+    def load_time_matrix(self):
+        """Load travel times from Time.csv file"""
+        time_matrix = {}
+        csv_file = 'data/Time.csv'
+        
+        if not os.path.exists(csv_file):
+            print(f"⚠️  Time.csv not found at {csv_file}, using default times")
+            return {}
+        
+        try:
+            with open(csv_file, 'r', newline='', encoding='utf-8') as csvfile:
+                reader = csv.reader(csvfile)
+                header = next(reader)  # Get station names from header
+                station_names = header[1:]  # Skip first empty column
+                
+                # Create station name to index mapping
+                name_to_index = {name: idx for idx, name in enumerate(station_names)}
+                
+                # Read time data
+                for row_idx, row in enumerate(reader):
+                    origin_station = row[0]
+                    
+                    for col_idx, time_str in enumerate(row[1:]):
+                        dest_station = station_names[col_idx]
+                        
+                        try:
+                            travel_time = int(time_str)
+                            time_matrix[(origin_station, dest_station)] = travel_time
+                        except (ValueError, IndexError):
+                            continue
+            
+            print(f"✅ Loaded {len(time_matrix)} time entries from Time.csv")
+            return time_matrix
+            
+        except Exception as e:
+            print(f"❌ Error loading Time.csv: {e}")
+            return {}
         
     def get_line_sequences(self):
         """Define actual KL Metro line sequences based on real topology"""
@@ -76,26 +117,42 @@ class TrainMovement:
             return None
     
     def get_travel_time(self, origin_id, dest_id):
-        """Get travel time from Time.csv data stored in fares table"""
+        """Get travel time between two stations using Time.csv data"""
         try:
+            # Get station names from IDs
             with get_db_connection() as conn:
-                result = conn.execute(
-                    'SELECT travel_time_min FROM fares WHERE origin_id = ? AND destination_id = ?',
-                    (origin_id, dest_id)
+                origin_name = conn.execute(
+                    'SELECT name FROM stations WHERE station_id = ?', (origin_id,)
+                ).fetchone()
+                dest_name = conn.execute(
+                    'SELECT name FROM stations WHERE station_id = ?', (dest_id,)
                 ).fetchone()
                 
-                if result and result[0] > 0:
-                    # Add realistic variation (±20%)
-                    base_time = result[0]
-                    variation = random.uniform(0.8, 1.2)
-                    return max(1, int(base_time * variation))
+                if not origin_name or not dest_name:
+                    return 180  # Default 3 minutes in seconds
                 
-                # Default time if no data found
-                return 3
+                origin_name = origin_name[0]
+                dest_name = dest_name[0]
+                
+                # Look up time in matrix (Time.csv contains minutes)
+                if (origin_name, dest_name) in self.time_matrix:
+                    minutes = self.time_matrix[(origin_name, dest_name)]
+                    
+                    # Convert to seconds and add realistic variation (±10%)
+                    base_seconds = minutes * 60
+                    variation = random.uniform(0.9, 1.1)
+                    actual_seconds = int(base_seconds * variation)
+                    
+                    print(f"🕐 Travel time {origin_name} → {dest_name}: {minutes} min ({actual_seconds}s)")
+                    return actual_seconds
+                
+                # Fallback: estimate based on distance
+                print(f"⚠️  No time data for {origin_name} → {dest_name}, using default")
+                return 180  # 3 minutes default
                 
         except Exception as e:
             print(f"Error getting travel time: {e}")
-            return 3
+            return 180
     
     def initialize_train(self, train_id, current_station_id, line):
         """Initialize train state for movement"""
@@ -104,19 +161,26 @@ class TrainMovement:
             if not current_station:
                 print(f"Warning: Could not find station {current_station_id}")
                 return False
-            
+
             station_name = current_station['name']
             
+            # Get the direction from database instead of calculating it
+            with get_db_connection() as conn:
+                train_data = conn.execute(
+                    'SELECT direction FROM trains WHERE train_id = ?',
+                    (train_id,)
+                ).fetchone()
+                
+                if train_data:
+                    db_direction = train_data[0]
+                else:
+                    print(f"Warning: Could not get direction for train {train_id}, defaulting to forward")
+                    db_direction = 'forward'
+
             # Find which line sequence this station belongs to
             for line_name, sequence in self.line_sequences.items():
                 if station_name in sequence:
                     position = sequence.index(station_name)
-                    
-                    # Determine initial direction based on position
-                    # Start near beginning -> forward, near end -> backward
-                    initial_direction = 'forward'
-                    if position > len(sequence) * 0.7:  # If in last 30% of line
-                        initial_direction = 'backward'
                     
                     self.train_states[train_id] = {
                         'current_station_id': current_station_id,
@@ -124,16 +188,16 @@ class TrainMovement:
                         'line': line_name,
                         'line_sequence': sequence,
                         'position_in_sequence': position,
-                        'direction': initial_direction,
+                        'direction': db_direction,  # Use direction from database
                         'last_update': time.time(),
                         'speed_factor': random.uniform(0.9, 1.1),
                         'direction_changes': 0
                     }
                     
                     print(f"Train {train_id} initialized on {line_name} at {station_name} "
-                          f"(position {position}/{len(sequence)-1}) direction: {initial_direction}")
+                          f"(position {position}/{len(sequence)-1}) direction: {db_direction}")
                     return True
-            
+
             print(f"Warning: Station {station_name} not found in any line sequence")
             return False
             
@@ -164,6 +228,13 @@ class TrainMovement:
                     state['direction_changes'] = state.get('direction_changes', 0) + 1
                     next_pos = current_pos - 1
                     next_station_name = sequence[next_pos]
+                    
+                    # Update direction in database
+                    with get_db_connection() as conn:
+                        conn.execute('UPDATE trains SET direction = ? WHERE train_id = ?', 
+                                   ('backward', train_id))
+                        conn.commit()
+                    
                     print(f"🔄 Train {train_id} reached END of {state['line']}, reversing to BACKWARD "
                           f"(changes: {state['direction_changes']})")
             
@@ -178,6 +249,13 @@ class TrainMovement:
                     state['direction_changes'] = state.get('direction_changes', 0) + 1
                     next_pos = current_pos + 1
                     next_station_name = sequence[next_pos]
+                    
+                    # Update direction in database
+                    with get_db_connection() as conn:
+                        conn.execute('UPDATE trains SET direction = ? WHERE train_id = ?', 
+                                   ('forward', train_id))
+                        conn.commit()
+                    
                     print(f"🔄 Train {train_id} reached START of {state['line']}, reversing to FORWARD "
                           f"(changes: {state['direction_changes']})")
             

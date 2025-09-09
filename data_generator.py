@@ -110,15 +110,23 @@ class TrainSimulator:
         while self.simulation_running:
             try:
                 iteration_count += 1
+                broadcasts_sent = 0
+                
                 print(f"\n--- Simulation Iteration {iteration_count} ---")
                 
                 # Process each train
                 for train_id in list(self.train_states.keys()):
                     try:
-                        self.simulate_single_train(train_id)
+                        # Only count if a broadcast was actually sent
+                        if self.simulate_single_train(train_id):
+                            broadcasts_sent += 1
                     except Exception as e:
                         print(f"Error simulating train {train_id}: {e}")
                         continue
+                
+                # Log broadcast efficiency
+                total_trains = len(self.train_states)
+                print(f"📡 Broadcasts sent: {broadcasts_sent}/{total_trains} trains (only on station changes)")
                 
                 # Occasional system events
                 if iteration_count % 20 == 0:  # Every 20 iterations
@@ -136,25 +144,53 @@ class TrainSimulator:
     def simulate_single_train(self, train_id):
         """Simulate single train movement using line-based movement"""
         try:
-            # Use train movement system
-            movement_result = self.train_movement.move_train(train_id)
-            
-            if movement_result:
-                # Update local state
-                if train_id in self.train_states:
-                    self.train_states[train_id]['current_station_id'] = movement_result['station_id']
-                    self.train_states[train_id]['last_update'] = time.time()
-                
-                # Queue update for broadcast
-                self.update_queue.put(movement_result)
-                
-                print(f"🚊 Train {train_id}: {movement_result['station_name']} ({movement_result['direction']}) "
-                      f"on {movement_result['line']}")
-            else:
-                print(f"⚠️  Train {train_id} movement failed - skipping this cycle")
+            # Use train movement system with station change detection
+            return self.move_train_and_broadcast(train_id)
                 
         except Exception as e:
             print(f"❌ Error in train {train_id} simulation: {e}")
+            return False
+    
+    def move_train_and_broadcast(self, train_id):
+        """Move train and broadcast only if station changed"""
+        try:
+            # Get current train state
+            current_state = self.train_states.get(train_id)
+            if not current_state:
+                return False
+                
+            # Store previous station for comparison
+            previous_station = current_state.get('current_station_id')
+            
+            # Move the train
+            movement_result = self.train_movement.move_train(train_id)
+            
+            if movement_result:
+                new_station_id = movement_result.get('station_id')
+                
+                # Only broadcast if station actually changed
+                if new_station_id and new_station_id != previous_station:
+                    # Update local state
+                    current_state['current_station_id'] = new_station_id
+                    current_state['last_update'] = time.time()
+                    
+                    # Queue update for broadcast
+                    self.update_queue.put(movement_result)
+                    
+                    print(f"🚊 Train {train_id} moved to: {movement_result['station_name']} ({movement_result['direction']}) "
+                          f"on {movement_result['line']}")
+                    return True
+                else:
+                    # Train hasn't moved to a new station yet - no broadcast
+                    print(f"⏸️  Train {train_id} still at: {movement_result.get('station_name', 'Unknown')} - no broadcast")
+                    return False
+            else:
+                print(f"⚠️  Train {train_id} movement failed - skipping this cycle")
+                return False
+                
+        except Exception as e:
+            print(f"Error moving train {train_id}: {e}")
+            return False
     
     def process_updates(self):
         """Process queued updates for broadcasting"""
@@ -162,6 +198,10 @@ class TrainSimulator:
             try:
                 if not self.update_queue.empty():
                     update_data = self.update_queue.get()
+                    
+                    # Enhanced logging for station change broadcasts
+                    print(f"📡 Broadcasting: Train {update_data.get('train_id')} at {update_data.get('station_name')} "
+                          f"({update_data.get('line')} line)")
                     
                     # Broadcast update
                     broadcast_train_update_enhanced(self.socketio, update_data)
