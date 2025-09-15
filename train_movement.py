@@ -3,7 +3,7 @@ Train Movement Logic for KL Metro System
 Implements realistic line-based sequential movement with Time.csv data
 """
 
-from database_enhanced import get_db_connection, update_train_position_enhanced
+from database import get_db_connection, update_train_position_enhanced
 import random
 import time
 import csv

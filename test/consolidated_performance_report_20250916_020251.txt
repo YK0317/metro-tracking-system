@@ -1,0 +1,62 @@
+================================================================================
+🚇 KL METRO TRACKING SYSTEM - CONSOLIDATED PERFORMANCE REPORT 🚇
+================================================================================
+
+📅 Report Generated: 2025-09-16 02:02:51
+🚀 Test Mode: Full Test Suite
+⏱️  Total Test Duration: 279.7 seconds
+
+==================================================
+📊 EXECUTIVE SUMMARY
+==================================================
+
+🎯 Performance Targets Achievement:
+-----------------------------------
+50+ Concurrent Clients         ✅ PASS
+< 100ms Socket.IO Latency      ✅ PASS
+< 50ms Database Queries        ✅ PASS
+< 40% CPU Usage                ❌ FAIL
+95%+ Success Rate              ✅ PASS
+
+
+==================================================
+📈 DETAILED PERFORMANCE METRICS
+==================================================
+
+🔌 Socket.IO Performance:
+-------------------------
+No Socket.IO performance data available
+
+🗄️  Database Performance:
+-----------------------
+Simple Query Average: 0.04ms
+Complex Query Average: 0.00ms
+Concurrent Query Rate: 1703.0 QPS
+Transaction Rate: 0.0 TPS
+
+💻 System Resource Usage:
+-------------------------
+Average CPU Usage: 18.5%
+Peak CPU Usage: 45.7%
+Average Memory Usage: 50.5%
+Peak Memory Usage: 51.4%
+
+==================================================
+🧪 TEST EXECUTION SUMMARY
+==================================================
+
+🔧 DATABASE Tests:
+  • ✅ PASS
+
+🔧 SOCKETIO Tests:
+  • burst: ✅ PASS
+  • ramp: ✅ PASS
+  • endurance: ✅ PASS
+
+🔧 COMPREHENSIVE Tests:
+  • ✅ PASS
+
+
+================================================================================
+📄 End of Report
+================================================================================

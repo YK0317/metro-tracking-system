@@ -3,7 +3,7 @@
 Generate trains for each metro line - one forward and one backward
 """
 
-from database_enhanced import get_db_connection
+from database import get_db_connection
 import random
 import os
 

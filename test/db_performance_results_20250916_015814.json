@@ -1,0 +1,60 @@
+{
+  "query_tests": [
+    {
+      "simple_select": {
+        "complexity": "simple_select",
+        "num_queries": 500,
+        "successful_queries": 250,
+        "success_rate": 0.5,
+        "avg_query_time_ms": 0.03199291229248047,
+        "min_query_time_ms": 0.0,
+        "max_query_time_ms": 7.000207901000977,
+        "median_query_time_ms": 0.0,
+        "p95_query_time_ms": 0.0,
+        "queries_per_second": 31256.923122782962
+      }
+    }
+  ],
+  "concurrent_tests": [
+    {
+      "test_type": "concurrent_access",
+      "num_threads": 20,
+      "queries_per_thread": 50,
+      "total_queries": 1000,
+      "successful_queries": 200,
+      "success_rate": 0.2,
+      "total_errors": 800,
+      "total_time_s": 0.1033484935760498,
+      "queries_per_second": 1935.1999538612376,
+      "avg_query_time_ms": 0.1929616928100586,
+      "min_query_time_ms": 0.0,
+      "max_query_time_ms": 3.1120777130126953,
+      "median_query_time_ms": 0.0,
+      "p95_query_time_ms": 1.9879698753356934
+    }
+  ],
+  "transaction_tests": [],
+  "summary": {
+    "test_timestamp": "2025-09-16T01:58:14.491981",
+    "database_path": "../metro_tracking_enhanced.db",
+    "performance_summary": {
+      "query_performance": {
+        "simple_select": {
+          "avg_time_ms": 0.03199291229248047,
+          "qps": 31256.923122782962,
+          "success_rate": 0.5
+        }
+      },
+      "concurrent_access": {
+        "total_qps": 1935.1999538612376,
+        "avg_latency_ms": 0.1929616928100586,
+        "success_rate": 0.2,
+        "max_threads_tested": 20
+      }
+    },
+    "target_evaluation": {
+      "meets_query_target": true,
+      "meets_concurrent_target": true
+    }
+  }
+}

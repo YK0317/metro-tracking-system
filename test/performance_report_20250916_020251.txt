@@ -1,0 +1,40 @@
+=== KL Metro Tracking System Performance Test Report ===
+
+Test Date: 2025-09-16T02:02:51.127739
+Total Duration: 116.61 seconds
+
+Socket.IO Performance:
+  - Concurrent Clients: 75
+  - Average Latency: 5.14ms
+  - Success Rate: 100.00%
+  - Total Events: 3150
+  - Train Updates: 3000
+  - Events/Second: 48.9
+  - Meets Targets: Latency=PASS, Concurrency=FAIL
+
+Database Performance:
+  - Average Query Time: 0.58ms
+  - Queries Completed: 1000
+  - Meets Target: PASS
+
+API Performance:
+  - Average Response Time: 2060.85ms
+  - Success Rate: 100.00%
+  - Requests Completed: 500
+
+System Resource Usage:
+  - Average CPU: 15.9%
+  - Maximum CPU: 41.2%
+  - Average Memory: 54.4%
+  - Meets CPU Target: PASS
+
+Performance Targets:
+  - 100 concurrent clients: FAIL
+  - <100ms latency: PASS
+  - <50ms DB queries: PASS
+  - <40% CPU usage: PASS
+
+Test Artifacts:
+  - Detailed JSON Results: performance_results_20250916_020251.json
+  - Log File: performance_test_20250916_020054.log
+  - Generated at: 2025-09-16T02:02:51.130739

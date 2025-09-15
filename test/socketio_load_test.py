@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Proper Socket.IO Load Test for Flask-SocketIO Server
 Tests the actual Socket.IO events and real-time functionality
@@ -12,6 +13,16 @@ import statistics
 import argparse
 from datetime import datetime
 import logging
+import sys
+import os
+
+# Fix for Windows console encoding issues
+if sys.platform == "win32":
+    # Set UTF-8 encoding for Windows console
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    # Alternative: use environment variable
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 class SocketIOLoadTest:
     def __init__(self, server_url="http://localhost:5000"):

@@ -7,8 +7,8 @@ import time
 import random
 import threading
 from queue import Queue
-from database_enhanced import get_db_connection, get_all_stations, update_train_position_enhanced
-from realtime_enhanced import broadcast_train_update_enhanced, broadcast_system_alert
+from database import get_db_connection, get_all_stations, update_train_position_enhanced
+from realtime import broadcast_train_update_enhanced, broadcast_system_alert
 from train_movement import TrainMovement
 
 class TrainSimulator:

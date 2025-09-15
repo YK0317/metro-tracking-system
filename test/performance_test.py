@@ -3,7 +3,7 @@
 REAL Performance Test Suite for KL Metro Tracking System (NO MOCKING)
 
 This script tests ACTUAL server performance:
-- Real WebSocket latency via round-trip time measurement
+- Real Socket.IO latency via round-trip time measurement
 - Actual database query execution times
 - Real API response times with high-precision timing
 - Actual system resource usage monitoring
@@ -13,7 +13,7 @@ Usage: python performance_test.py [--concurrent-clients N] [--test-duration S]
 """
 
 import asyncio
-import websockets
+import socketio
 import json
 import time
 import sqlite3
@@ -50,13 +50,13 @@ logger.info(f"Test timestamp: {datetime.now().isoformat()}")
 logger.info("All measurements are REAL - no mocked values")
 
 class PerformanceTest:
-    def __init__(self, base_url="http://localhost:5000", ws_url="ws://localhost:8765", 
+    def __init__(self, base_url="http://localhost:5000", socketio_url="http://localhost:5000", 
                  db_path="../metro_tracking_enhanced.db"):
         self.base_url = base_url
-        self.ws_url = ws_url  # Pure WebSocket server on port 8765
+        self.socketio_url = socketio_url  # Socket.IO server URL
         self.db_path = db_path
         self.results = {
-            'websocket_tests': [],
+            'socketio_tests': [],
             'database_tests': [],
             'api_tests': [],
             'system_metrics': [],
@@ -91,163 +91,211 @@ class PerformanceTest:
             return sorted_data[-1]
         return sorted_data[f] + (k - f) * (sorted_data[c] - sorted_data[f])
 
-    async def test_websocket_client(self, client_id, duration=30):
-        """Test individual WebSocket client with REAL latency measurements"""
-        ping_responses = {}  # Track ping-pong for real latency measurement
-        messages_received = 0
-        connection_start_time = None
-        connection_time = None
-        latencies = []
+    def test_socketio_client(self, client_id, duration=30):
+        """Test individual Socket.IO client with REAL latency measurements"""
+        client_stats = {
+            'client_id': client_id,
+            'connected': False,
+            'events_received': {},
+            'train_updates_count': 0,
+            'connection_time': None,
+            'ping_responses': {},
+            'latencies': [],
+            'errors': []
+        }
         
+        # Create Socket.IO client
+        sio = socketio.Client(logger=False, engineio_logger=False)
+        
+        @sio.event
+        def connect():
+            """Handle successful connection"""
+            client_stats['connected'] = True
+            client_stats['connection_time'] = time.perf_counter()
+            logger.debug(f"Client {client_id}: Connected to Socket.IO server")
+            
+        @sio.event
+        def disconnect():
+            """Handle disconnection"""
+            logger.debug(f"Client {client_id}: Disconnected from Socket.IO server")
+            
+        @sio.event
+        def connect_error(data):
+            """Handle connection errors"""
+            error_msg = f"Connection error: {data}"
+            client_stats['errors'].append(error_msg)
+            logger.warning(f"Client {client_id}: {error_msg}")
+            
+        @sio.event
+        def initial_trains(data):
+            """Handle initial train data"""
+            client_stats['events_received']['initial_trains'] = client_stats['events_received'].get('initial_trains', 0) + 1
+            logger.debug(f"Client {client_id}: Received initial trains data")
+            
+        @sio.event
+        def train_update(data):
+            """Handle real-time train updates"""
+            client_stats['events_received']['train_update'] = client_stats['events_received'].get('train_update', 0) + 1
+            client_stats['train_updates_count'] += 1
+            
+            # Check for latency measurement if timestamp is available
+            if isinstance(data, dict) and 'timestamp' in data:
+                receive_time = time.perf_counter() * 1000
+                send_time = data['timestamp']
+                if isinstance(send_time, (int, float)):
+                    latency = receive_time - send_time
+                    if 0 < latency < 10000:  # Sanity check (less than 10 seconds)
+                        client_stats['latencies'].append(latency)
+            
+        @sio.event
+        def pong(data):
+            """Handle pong response for latency measurement"""
+            if 'ping_id' in data:
+                ping_id = data['ping_id']
+                if ping_id in client_stats['ping_responses']:
+                    send_time = client_stats['ping_responses'][ping_id]
+                    receive_time = time.perf_counter() * 1000
+                    latency = receive_time - send_time
+                    client_stats['latencies'].append(latency)
+                    del client_stats['ping_responses'][ping_id]
+                    logger.debug(f"Client {client_id}: Ping latency {latency:.2f}ms")
+            
+        @sio.event
+        def status(data):
+            """Handle status messages"""
+            client_stats['events_received']['status'] = client_stats['events_received'].get('status', 0) + 1
+            
         try:
-            # Measure ACTUAL connection time
-            connection_start_time = time.perf_counter()
-            async with websockets.connect(self.ws_url) as websocket:
-                connection_end_time = time.perf_counter()
-                connection_time = (connection_end_time - connection_start_time) * 1000
+            # Measure connection time
+            connect_start = time.perf_counter()
+            sio.connect(self.socketio_url)
+            
+            if client_stats['connected']:
+                connect_time = (time.perf_counter() - connect_start) * 1000
                 
-                logger.debug(f"Client {client_id}: Connected in {connection_time:.2f}ms")
-                
-                # Send initial subscription
-                subscribe_msg = {
-                    "type": "subscribe",
-                    "data": {"route": "all"}
-                }
-                await websocket.send(json.dumps(subscribe_msg))
-                
+                # Test duration
                 start_time = time.perf_counter()
                 last_ping_time = start_time
                 
                 while (time.perf_counter() - start_time) < duration:
                     try:
-                        # Send ping every 2 seconds to measure REAL latency
+                        # Send ping every 2 seconds to measure latency
                         current_time = time.perf_counter()
                         if current_time - last_ping_time >= 2.0:
                             ping_id = str(uuid.uuid4())
-                            ping_timestamp = time.perf_counter() * 1000  # High precision timestamp
+                            ping_timestamp = current_time * 1000
                             
-                            ping_msg = {
-                                "type": "ping",
-                                "ping_id": ping_id,
-                                "timestamp": ping_timestamp
-                            }
+                            sio.emit('ping', {
+                                'ping_id': ping_id,
+                                'timestamp': ping_timestamp
+                            })
                             
-                            await websocket.send(json.dumps(ping_msg))
-                            ping_responses[ping_id] = ping_timestamp
+                            client_stats['ping_responses'][ping_id] = ping_timestamp
                             last_ping_time = current_time
                         
-                        # Listen for messages with timeout
-                        try:
-                            message = await asyncio.wait_for(websocket.recv(), timeout=1.0)
-                            receive_time = time.perf_counter() * 1000
-                            messages_received += 1
-                            
-                            # Try to parse message and check for ping response
-                            try:
-                                data = json.loads(message)
-                                
-                                # Check if this is a pong response for REAL latency
-                                if data.get('type') == 'pong' and 'ping_id' in data:
-                                    ping_id = data['ping_id']
-                                    if ping_id in ping_responses:
-                                        send_time = ping_responses[ping_id]
-                                        real_latency = receive_time - send_time
-                                        latencies.append(real_latency)
-                                        del ping_responses[ping_id]
-                                        logger.debug(f"Client {client_id}: REAL ping latency {real_latency:.2f}ms")
-                                
-                                # Also check for server timestamps for additional latency measurement
-                                elif 'server_timestamp' in data:
-                                    server_time = data['server_timestamp']
-                                    # Calculate approximate latency (half round-trip)
-                                    estimated_latency = (receive_time - server_time) / 2
-                                    if 0 < estimated_latency < 1000:  # Sanity check
-                                        latencies.append(estimated_latency)
-                                        
-                            except json.JSONDecodeError:
-                                pass  # Not JSON, just count as received message
-                            
-                        except asyncio.TimeoutError:
-                            # No message received, continue
-                            continue
-                            
+                        # Keep connection alive
+                        time.sleep(0.1)
+                        
                     except Exception as e:
-                        logger.warning(f"Client {client_id}: Message error - {e}")
+                        logger.warning(f"Client {client_id}: Event error - {e}")
                         break
                         
+                session_duration = time.perf_counter() - start_time
+                
+                result = {
+                    'client_id': client_id,
+                    'connection_time_ms': connect_time,
+                    'duration': session_duration,
+                    'events_received': dict(client_stats['events_received']),
+                    'train_updates_count': client_stats['train_updates_count'],
+                    'latencies': client_stats['latencies'],
+                    'avg_latency_ms': statistics.mean(client_stats['latencies']) if client_stats['latencies'] else None,
+                    'min_latency_ms': min(client_stats['latencies']) if client_stats['latencies'] else None,
+                    'max_latency_ms': max(client_stats['latencies']) if client_stats['latencies'] else None,
+                    'median_latency_ms': statistics.median(client_stats['latencies']) if client_stats['latencies'] else None,
+                    'success_rate': 1.0 if client_stats['train_updates_count'] > 0 or any(client_stats['events_received'].values()) else 0.0,
+                    'errors': client_stats['errors']
+                }
+                
+                logger.debug(f"Client {client_id}: Session completed - "
+                           f"{sum(client_stats['events_received'].values())} events received")
+                
+                return result
+            else:
+                logger.error(f"Client {client_id}: Failed to connect")
+                return None
+                
         except Exception as e:
-            logger.error(f"Client {client_id}: Connection error - {e}")
+            error_msg = f"Client {client_id} error: {e}"
+            logger.error(error_msg)
             return None
             
-        if latencies or messages_received > 0:
-            session_duration = time.perf_counter() - start_time
-            
-            result = {
-                'client_id': client_id,
-                'connection_time_ms': connection_time,
-                'duration': session_duration,
-                'messages_received': messages_received,
-                'real_latencies': latencies,
-                'avg_latency_ms': statistics.mean(latencies) if latencies else None,
-                'min_latency_ms': min(latencies) if latencies else None,
-                'max_latency_ms': max(latencies) if latencies else None,
-                'median_latency_ms': statistics.median(latencies) if latencies else None,
-                'success_rate': 1.0 if messages_received > 0 else 0.0,
-                'message_rate': messages_received / session_duration if session_duration > 0 else 0
-            }
-            
-            if latencies:
-                logger.info(f"Client {client_id}: REAL avg latency: {result['avg_latency_ms']:.2f}ms, "
-                           f"Messages: {messages_received}")
-            else:
-                logger.info(f"Client {client_id}: No latency data (no ping responses), Messages: {messages_received}")
-            return result
-        
-        return None
+        finally:
+            try:
+                sio.disconnect()
+            except:
+                pass
 
-    async def test_concurrent_websockets(self, num_clients=50, duration=30):
-        """Test concurrent WebSocket connections with REAL performance measurement"""
-        logger.info(f"Starting REAL WebSocket test with {num_clients} concurrent clients for {duration}s")
+    def test_concurrent_socketio(self, num_clients=50, duration=30):
+        """Test concurrent Socket.IO connections with REAL performance measurement"""
+        logger.info(f"Starting REAL Socket.IO test with {num_clients} concurrent clients for {duration}s")
         
         start_time = time.perf_counter()
         
-        # Create tasks for all clients
-        tasks = [
-            self.test_websocket_client(i, duration)
-            for i in range(num_clients)
-        ]
+        # Use ThreadPoolExecutor for concurrent Socket.IO clients
+        successful_results = []
+        failed_count = 0
         
-        # Run all clients concurrently
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        def run_client(client_id):
+            return self.test_socketio_client(client_id, duration)
         
-        # Filter successful results
-        successful_results = [r for r in results if r is not None and not isinstance(r, Exception)]
-        failed_count = len([r for r in results if isinstance(r, Exception)])
+        with ThreadPoolExecutor(max_workers=min(num_clients, 100)) as executor:
+            # Submit all client tasks
+            futures = [executor.submit(run_client, i) for i in range(num_clients)]
+            
+            # Collect results as they complete
+            for i, future in enumerate(as_completed(futures)):
+                try:
+                    result = future.result()
+                    if result is not None:
+                        successful_results.append(result)
+                    else:
+                        failed_count += 1
+                except Exception as e:
+                    logger.error(f"Client task failed: {e}")
+                    failed_count += 1
+                
+                # Log progress
+                if (i + 1) % 10 == 0:
+                    logger.info(f"Completed {i + 1}/{num_clients} Socket.IO clients")
         
         total_time = time.perf_counter() - start_time
         
         if successful_results:
-            # Aggregate REAL latency data
+            # Aggregate Socket.IO performance data
             all_latencies = []
-            total_messages = 0
+            total_events = 0
+            total_train_updates = 0
             connection_times = []
             
             for result in successful_results:
-                if result['real_latencies']:
-                    all_latencies.extend(result['real_latencies'])
-                total_messages += result['messages_received']
+                if result['latencies']:
+                    all_latencies.extend(result['latencies'])
+                total_events += sum(result['events_received'].values())
+                total_train_updates += result['train_updates_count']
                 if result['connection_time_ms']:
                     connection_times.append(result['connection_time_ms'])
             
             summary = {
-                'test_type': 'real_concurrent_websockets',
+                'test_type': 'real_concurrent_socketio',
                 'num_clients': num_clients,
                 'successful_clients': len(successful_results),
                 'failed_clients': failed_count,
                 'success_rate': len(successful_results) / num_clients,
                 'total_duration': total_time,
-                'total_messages': total_messages,
-                'messages_per_second': total_messages / total_time if total_time > 0 else 0,
+                'total_events': total_events,
+                'total_train_updates': total_train_updates,
+                'events_per_second': total_events / total_time if total_time > 0 else 0,
                 'connection_stats': {
                     'avg_connection_time_ms': statistics.mean(connection_times) if connection_times else None,
                     'min_connection_time_ms': min(connection_times) if connection_times else None,
@@ -255,7 +303,7 @@ class PerformanceTest:
                 }
             }
             
-            # Add REAL latency statistics if available
+            # Add Socket.IO latency statistics if available
             if all_latencies:
                 summary['avg_latency_ms'] = statistics.mean(all_latencies)
                 summary['min_latency_ms'] = min(all_latencies)
@@ -268,15 +316,16 @@ class PerformanceTest:
                 summary['avg_latency_ms'] = None
                 summary['latency_note'] = "No latency data available (server may not support ping/pong)"
             
-            self.results['websocket_tests'].append(summary)
+            self.results['socketio_tests'].append(summary)
             
-            logger.info(f"REAL WebSocket test completed: {len(successful_results)}/{num_clients} clients successful")
+            logger.info(f"REAL Socket.IO test completed: {len(successful_results)}/{num_clients} clients successful")
             if all_latencies:
                 logger.info(f"REAL Average latency: {summary['avg_latency_ms']:.2f}ms (from {len(all_latencies)} samples)")
                 logger.info(f"REAL P95 latency: {summary['p95_latency_ms']:.2f}ms")
             else:
                 logger.info("No real latency measurements available")
-            logger.info(f"Message rate: {summary['messages_per_second']:.2f} msg/s")
+            logger.info(f"Event rate: {summary['events_per_second']:.2f} events/s")
+            logger.info(f"Train updates: {total_train_updates}")
             
         return successful_results
 
@@ -485,9 +534,9 @@ class PerformanceTest:
             logger.info("\n=== API Performance Test ===")
             self.test_api_performance(500)
             
-            # 3. WebSocket concurrent test
-            logger.info("\n=== WebSocket Concurrent Test ===")
-            await self.test_concurrent_websockets(concurrent_clients, test_duration)
+            # 3. Socket.IO concurrent test
+            logger.info("\n=== Socket.IO Concurrent Test ===")
+            self.test_concurrent_socketio(concurrent_clients, test_duration)
             
         except Exception as e:
             logger.error(f"Test execution error: {e}")
@@ -517,16 +566,19 @@ class PerformanceTest:
             'results_summary': {}
         }
         
-        # WebSocket results
-        if self.results['websocket_tests']:
-            ws_test = self.results['websocket_tests'][-1]
+        # Socket.IO results
+        if self.results['socketio_tests']:
+            socketio_test = self.results['socketio_tests'][-1]
             summary['tests_completed'] += 1
-            summary['results_summary']['websocket'] = {
-                'concurrent_clients_achieved': ws_test['successful_clients'],
-                'avg_latency_ms': ws_test['avg_latency_ms'],
-                'success_rate': ws_test['success_rate'],
-                'meets_latency_target': ws_test['avg_latency_ms'] <= 100,
-                'meets_concurrency_target': ws_test['successful_clients'] >= 100
+            summary['results_summary']['socketio'] = {
+                'concurrent_clients_achieved': socketio_test['successful_clients'],
+                'avg_latency_ms': socketio_test['avg_latency_ms'],
+                'success_rate': socketio_test['success_rate'],
+                'total_events': socketio_test['total_events'],
+                'total_train_updates': socketio_test['total_train_updates'],
+                'events_per_second': socketio_test['events_per_second'],
+                'meets_latency_target': socketio_test['avg_latency_ms'] <= 100 if socketio_test['avg_latency_ms'] else False,
+                'meets_concurrency_target': socketio_test['successful_clients'] >= 100
             }
         
         # Database results
@@ -600,13 +652,16 @@ class PerformanceTest:
                 f.write(f"Test Date: {self.results['summary']['test_timestamp']}\n")
                 f.write(f"Total Duration: {self.results['summary']['total_duration']:.2f} seconds\n\n")
                 
-                if 'websocket' in self.results['summary']['results_summary']:
-                    ws = self.results['summary']['results_summary']['websocket']
-                    f.write("WebSocket Performance:\n")
-                    f.write(f"  - Concurrent Clients: {ws['concurrent_clients_achieved']}\n")
-                    f.write(f"  - Average Latency: {ws['avg_latency_ms']:.2f}ms\n")
-                    f.write(f"  - Success Rate: {ws['success_rate']:.2%}\n")
-                    f.write(f"  - Meets Targets: Latency={'PASS' if ws['meets_latency_target'] else 'FAIL'}, Concurrency={'PASS' if ws['meets_concurrency_target'] else 'FAIL'}\n\n")
+                if 'socketio' in self.results['summary']['results_summary']:
+                    socketio_result = self.results['summary']['results_summary']['socketio']
+                    f.write("Socket.IO Performance:\n")
+                    f.write(f"  - Concurrent Clients: {socketio_result['concurrent_clients_achieved']}\n")
+                    f.write(f"  - Average Latency: {socketio_result['avg_latency_ms']:.2f}ms\n" if socketio_result['avg_latency_ms'] else "  - Average Latency: N/A (no ping/pong data)\n")
+                    f.write(f"  - Success Rate: {socketio_result['success_rate']:.2%}\n")
+                    f.write(f"  - Total Events: {socketio_result['total_events']}\n")
+                    f.write(f"  - Train Updates: {socketio_result['total_train_updates']}\n")
+                    f.write(f"  - Events/Second: {socketio_result['events_per_second']:.1f}\n")
+                    f.write(f"  - Meets Targets: Latency={'PASS' if socketio_result['meets_latency_target'] else 'FAIL'}, Concurrency={'PASS' if socketio_result['meets_concurrency_target'] else 'FAIL'}\n\n")
                 
                 if 'database' in self.results['summary']['results_summary']:
                     db = self.results['summary']['results_summary']['database']
@@ -632,9 +687,9 @@ class PerformanceTest:
                 
                 f.write("Performance Targets:\n")
                 f.write("  - 100 concurrent clients: " + 
-                       ("PASS" if self.results['summary']['results_summary'].get('websocket', {}).get('meets_concurrency_target', False) else "FAIL") + "\n")
+                       ("PASS" if self.results['summary']['results_summary'].get('socketio', {}).get('meets_concurrency_target', False) else "FAIL") + "\n")
                 f.write("  - <100ms latency: " + 
-                       ("PASS" if self.results['summary']['results_summary'].get('websocket', {}).get('meets_latency_target', False) else "FAIL") + "\n")
+                       ("PASS" if self.results['summary']['results_summary'].get('socketio', {}).get('meets_latency_target', False) else "FAIL") + "\n")
                 f.write("  - <50ms DB queries: " + 
                        ("PASS" if self.results['summary']['results_summary'].get('database', {}).get('meets_query_target', False) else "FAIL") + "\n")
                 f.write("  - <40% CPU usage: " + 
@@ -655,20 +710,20 @@ class PerformanceTest:
 async def main():
     parser = argparse.ArgumentParser(description='KL Metro Tracking System Performance Test')
     parser.add_argument('--concurrent-clients', type=int, default=100,
-                       help='Number of concurrent WebSocket clients (default: 100)')
+                       help='Number of concurrent Socket.IO clients (default: 100)')
     parser.add_argument('--test-duration', type=int, default=60,
                        help='Test duration in seconds (default: 60)')
     parser.add_argument('--base-url', default='http://localhost:5000',
                        help='Base URL for the application (default: http://localhost:5000)')
-    parser.add_argument('--ws-url', default='ws://localhost:5000/ws',
-                       help='WebSocket URL (default: ws://localhost:5000/ws)')
+    parser.add_argument('--socketio-url', default='http://localhost:5000',
+                       help='Socket.IO server URL (default: http://localhost:5000)')
     
     args = parser.parse_args()
     
     # Create test instance
     test = PerformanceTest(
         base_url=args.base_url,
-        ws_url=args.ws_url
+        socketio_url=args.socketio_url
     )
     
     # Run comprehensive test

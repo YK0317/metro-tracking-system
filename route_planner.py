@@ -5,7 +5,7 @@ Provides accurate route planning with line transfers and detailed step informati
 
 import csv
 import os
-from database_enhanced import get_db_connection
+from database import get_db_connection
 
 class EnhancedRoutePlanner:
     """Route planner that uses the detailed Route.csv data for accurate planning"""

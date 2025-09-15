@@ -17,8 +17,8 @@ app.config['SECRET_KEY'] = 'your-secret-key-here-change-in-production'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading', logger=False, engineio_logger=False)
 
 # Import modules
-from database_enhanced import init_db, get_db_connection
-from realtime_enhanced import init_realtime
+from database import init_db, get_db_connection
+from realtime import init_realtime
 from data_generator import start_data_generator
 print("Using train movement system with line-based movement")
 

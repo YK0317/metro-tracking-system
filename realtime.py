@@ -4,7 +4,7 @@ Incorporates concepts from Lab2 multicast exercises for efficient broadcasting
 """
 
 from flask_socketio import emit, disconnect
-from database_enhanced import get_all_trains_enhanced
+from database import get_all_trains_enhanced
 import socket
 import struct
 import threading
@@ -113,14 +113,25 @@ def init_realtime(socketio):
             emit('error', {'msg': f'Zone subscription failed: {str(e)}', 'error_type': 'subscription_error'})
     
     @socketio.on('ping')
-    def handle_ping():
-        """Enhanced ping with system metrics"""
-        emit('pong', {
+    def handle_ping(data=None):
+        """Enhanced ping with system metrics and latency measurement support"""
+        response = {
             'timestamp': time.time(),
             'server_status': 'healthy',
             'connected_clients': len(enhanced_rt.websocket_clients),
             'multicast_enabled': enhanced_rt.multicast_socket is not None
-        })
+        }
+        
+        # Echo back ping_id if provided for latency measurement
+        if data and isinstance(data, dict) and 'ping_id' in data:
+            response['ping_id'] = data['ping_id']
+            
+        # Echo back client timestamp if provided for latency calculation
+        if data and isinstance(data, dict) and 'timestamp' in data:
+            response['client_timestamp'] = data['timestamp']
+            response['server_timestamp'] = time.time()
+            
+        emit('pong', response)
     
     # Store enhanced realtime instance for use in data generator
     socketio.enhanced_realtime = enhanced_rt
