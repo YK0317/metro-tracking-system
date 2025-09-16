@@ -307,23 +307,29 @@ class TestRunner:
         for filename, data in all_results.items():
             try:
                 if 'socketio' in filename:
-                    # Socket.IO test results
-                    if 'summary' in data:
-                        summary = data['summary']
+                    # Socket.IO test results - direct structure, no summary wrapper
+                    if 'successful_connections' in data:
+                        # Calculate average latency from connection_times
+                        connection_times = data.get('connection_times', [])
+                        avg_latency = sum(connection_times) * 1000 / len(connection_times) if connection_times else 0
+                        
+                        total_connections = data.get('successful_connections', 0) + data.get('failed_connections', 0)
+                        success_rate = data.get('successful_connections', 0) / total_connections if total_connections > 0 else 0
+                        
                         metrics['socketio_data'] = {
-                            'max_clients': summary.get('successful_connections', 0),
-                            'avg_latency': summary.get('avg_latency_ms', 0),
-                            'success_rate': summary.get('connection_success_rate', 0),
-                            'message_rate': summary.get('events_received', {}).get('train_update', 0)
+                            'max_clients': data.get('successful_connections', 0),
+                            'avg_latency': avg_latency,
+                            'success_rate': success_rate,
+                            'message_rate': data.get('events_received', {}).get('train_update', 0)
                         }
                         metrics['max_concurrent_clients'] = max(
                             metrics['max_concurrent_clients'],
-                            summary.get('successful_connections', 0)
+                            data.get('successful_connections', 0)
                         )
-                        if summary.get('avg_latency_ms', 0) > 0:
+                        if avg_latency > 0:
                             metrics['avg_socketio_latency'] = min(
                                 metrics['avg_socketio_latency'],
-                                summary.get('avg_latency_ms', float('inf'))
+                                avg_latency
                             )
                 
                 elif 'db_performance' in filename:

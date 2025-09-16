@@ -65,12 +65,16 @@ pip install -r requirements.txt
 # Initialize database with station and fare data
 python initialize_database.py
 
-# Generate trains for metro lines
-python add_trains_direct.py
+# Add trains for metro lines from Csv file
+python generate_trains.py
 
 # Run the application
 python app.py
+
+
+
 ```
+
 
 
 ### 4. Access the Application
@@ -90,7 +94,92 @@ python -c "from realtime
  import *; print('Multicast system ready')"
 ```
 
-## 📁 Project Structure
+## � Train Management with CSV Files
+
+The system supports dynamic train management through CSV files, allowing you to add, modify, or configure trains while the system is running.
+
+### Adding Trains to Running System
+
+Use `add_trains_direct.py` to add trains from a CSV file to a running Flask application:
+
+```bash
+python add_trains_direct.py
+```
+
+**Prerequisites:**
+- Flask application must be running (`python app.py`)
+- Database must be initialized with stations
+- CSV file must exist at `data/Trains.csv`
+
+### CSV File Format
+
+The `data/Trains.csv` file should contain the following columns:
+
+```csv
+train_id,train_type,initial_station_id,line,max_speed,initial_passengers,status
+1,LRT,1,KJL,40.0,150,active
+2,LRT,37,KJL,40.0,120,active
+3,MRT,38,SBK,50.0,180,active
+4,MRT,68,SBK,50.0,160,active
+```
+
+**Column Descriptions:**
+- `train_id`: Unique identifier for the train (integer)
+- `train_type`: Type of train (e.g., "LRT", "MRT")
+- `initial_station_id`: Starting station ID where train will be placed
+- `line`: Metro line code ("KJL" for Kelana Jaya Line, "SBK" for Sungai Buloh-Kajang Line)
+- `max_speed`: Maximum speed in km/h (float)
+- `initial_passengers`: Initial passenger count (integer)
+- `status`: Train status ("active", "maintenance", "inactive")
+
+### Train Management Examples
+
+```bash
+# Check current active trains
+python -c "
+import sqlite3
+conn = sqlite3.connect('metro_tracking_enhanced.db')
+trains = conn.execute('SELECT train_id, line, status FROM trains').fetchall()
+for train in trains:
+    print(f'Train {train[0]}: {train[1]} Line - {train[2]}')
+"
+
+# Add trains while system is running
+python add_trains_direct.py
+
+# Verify trains were added
+python -c "
+import sqlite3
+conn = sqlite3.connect('metro_tracking_enhanced.db')
+count = conn.execute('SELECT COUNT(*) FROM trains WHERE status = \"active\"').fetchone()[0]
+print(f'Active trains: {count}')
+"
+```
+
+### Troubleshooting Train Addition
+
+If `add_trains_direct.py` fails:
+
+1. **Database Locked Error**: Wait for Flask to fully initialize, then retry
+2. **Station Not Found**: Verify `initial_station_id` exists in stations table
+3. **CSV Format Error**: Check CSV column names and data types
+4. **Permission Error**: Ensure Flask app has database write permissions
+
+```bash
+# Check if Flask is ready for train addition
+python -c "
+import sqlite3
+try:
+    conn = sqlite3.connect('metro_tracking_enhanced.db', timeout=5)
+    count = conn.execute('SELECT COUNT(*) FROM stations').fetchone()[0]
+    print(f'✅ Database ready - {count} stations available')
+    conn.close()
+except Exception as e:
+    print(f'❌ Database not ready: {e}')
+"
+```
+
+## �📁 Project Structure
 
 ```
 metro-tracking-system/

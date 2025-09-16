@@ -104,17 +104,14 @@ _connection_pool = DatabaseConnectionPool()
 @contextmanager
 def get_db():
     """Simple database context manager for debugging"""
-    print("Creating direct database connection...")
     try:
         conn = sqlite3.connect(DATABASE_PATH, timeout=30)
         conn.row_factory = sqlite3.Row
-        print("Direct database connection created successfully")
         yield conn
     except Exception as e:
         print(f"Error creating direct database connection: {e}")
         raise
     finally:
-        print("Closing direct database connection...")
         try:
             conn.close()
         except:
@@ -122,11 +119,9 @@ def get_db():
 
 def get_db_connection():
     """Get a simple database connection for debugging"""
-    print("Creating simple database connection...")
     try:
         conn = sqlite3.connect(DATABASE_PATH, timeout=30)
         conn.row_factory = sqlite3.Row
-        print("Simple database connection created successfully")
         return conn
     except Exception as e:
         print(f"Error creating simple database connection: {e}")

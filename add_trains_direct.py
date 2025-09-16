@@ -8,6 +8,13 @@ import time
 import random
 import csv
 import os
+import sys
+
+# Fix Windows console encoding issues
+if sys.platform == "win32":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 def load_trains_from_csv():
     """Load train configuration from CSV file"""

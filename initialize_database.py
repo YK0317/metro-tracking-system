@@ -6,6 +6,14 @@ Loads station and fare data from CSV files into the database
 import sqlite3
 import csv
 import os
+import sys
+from database import init_db
+
+# Fix Windows console encoding issues
+if sys.platform == "win32":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 def initialize_database_with_data():
     """Initialize database with station and fare data from CSV files"""
@@ -13,15 +21,24 @@ def initialize_database_with_data():
     print("=" * 50)
     
     try:
+        # Initialize database schema first
+        print("🏗️  Creating database schema...")
+        init_db()
+        print("✅ Database schema created")
+        
         # Connect to database
         conn = sqlite3.connect('metro_tracking_enhanced.db', timeout=30.0)
         conn.row_factory = sqlite3.Row
         
-        # Clear existing data
+        # Clear existing data (only if tables exist)
         print("🧹 Clearing existing data...")
-        conn.execute("DELETE FROM fares")
-        conn.execute("DELETE FROM stations")
-        conn.commit()
+        try:
+            conn.execute("DELETE FROM fares")
+            conn.execute("DELETE FROM stations")
+            conn.commit()
+        except sqlite3.OperationalError:
+            # Tables might not exist yet, which is fine
+            pass
         
         # Load stations from CSV header
         print("📍 Loading stations...")

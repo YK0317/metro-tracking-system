@@ -143,7 +143,6 @@ class TrainMovement:
                     variation = random.uniform(0.9, 1.1)
                     actual_seconds = int(base_seconds * variation)
                     
-                    print(f"🕐 Travel time {origin_name} → {dest_name}: {minutes} min ({actual_seconds}s)")
                     return actual_seconds
                 
                 # Fallback: estimate based on distance

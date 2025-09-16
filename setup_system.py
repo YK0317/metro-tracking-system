@@ -8,6 +8,12 @@ import sys
 import os
 import time
 
+# Fix Windows console encoding issues
+if sys.platform == "win32":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 def print_banner():
     """Print setup banner"""
     print("🚇" * 30)
@@ -35,20 +41,53 @@ def install_dependencies():
         if not os.path.exists('requirements.txt'):
             print("⚠️  requirements.txt not found. Installing essential packages...")
             essential_packages = [
-                'flask', 'flask-socketio', 'sqlite3'
+                'flask', 'flask-socketio', 'pandas'
             ]
             for package in essential_packages:
                 print(f"Installing {package}...")
                 subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
         else:
             print("Installing from requirements.txt...")
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-r', 'requirements.txt'])
+            # Try to install with fallback for problematic packages
+            try:
+                subprocess.check_call([sys.executable, '-m', 'pip', 'install', '-r', 'requirements.txt'])
+            except subprocess.CalledProcessError as e:
+                print(f"⚠️  Full requirements.txt installation failed: {e}")
+                print("Attempting to install essential packages only...")
+                
+                # Essential packages that usually work without compilation
+                essential_packages = [
+                    'Flask==2.3.3',
+                    'Flask-SocketIO==5.3.6', 
+                    'pandas>=1.5.0',
+                    'Jinja2==3.1.2',
+                    'MarkupSafe==2.1.3',
+                    'itsdangerous==2.1.2',
+                    'click==8.1.7',
+                    'blinker==1.6.2'
+                ]
+                
+                failed_packages = []
+                for package in essential_packages:
+                    try:
+                        print(f"Installing {package}...")
+                        subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
+                    except subprocess.CalledProcessError:
+                        failed_packages.append(package)
+                        print(f"⚠️  Failed to install {package}")
+                
+                if failed_packages:
+                    print(f"⚠️  Some packages failed to install: {failed_packages}")
+                    print("The system may still work with reduced functionality.")
+                    print("You can install missing packages manually later.")
         
-        print("✅ Dependencies installed successfully")
+        print("✅ Dependencies installation completed")
         return True
         
-    except subprocess.CalledProcessError as e:
+    except Exception as e:
         print(f"❌ Failed to install dependencies: {e}")
+        print("💡 Try installing packages manually:")
+        print("   pip install flask flask-socketio pandas")
         return False
 
 def initialize_database():
@@ -58,19 +97,25 @@ def initialize_database():
     
     try:
         result = subprocess.run([sys.executable, 'initialize_database.py'], 
-                              capture_output=True, text=True, timeout=60)
+                              capture_output=True, text=True, timeout=60,
+                              encoding='utf-8', errors='replace')
         
         if result.returncode == 0:
             print("✅ Database initialized with stations and fare data")
-            # Print key output lines
-            lines = result.stdout.split('\n')
-            for line in lines:
-                if 'Loaded' in line or 'stations' in line or 'fare' in line:
-                    print(f"   {line}")
+            # Print key output lines safely
+            try:
+                if result.stdout:
+                    lines = result.stdout.split('\n')
+                    for line in lines:
+                        if any(keyword in line.lower() for keyword in ['loaded', 'stations', 'fare', 'success']):
+                            print(f"   {line}")
+            except Exception:
+                print("   Database initialization completed successfully")
             return True
         else:
             print(f"❌ Database initialization failed:")
-            print(result.stderr)
+            if result.stderr:
+                print(result.stderr)
             return False
             
     except subprocess.TimeoutExpired:
@@ -86,20 +131,26 @@ def load_trains():
     print("-" * 40)
     
     try:
-        result = subprocess.run([sys.executable, 'add_trains_direct.py'], 
-                              capture_output=True, text=True, timeout=30)
+        result = subprocess.run([sys.executable, 'generate_trains.py'], 
+                              capture_output=True, text=True, timeout=30,
+                              encoding='utf-8', errors='replace')
         
         if result.returncode == 0:
             print("✅ Trains loaded successfully")
-            # Extract key information
-            lines = result.stdout.split('\n')
-            for line in lines:
-                if 'Successfully added' in line or 'Total active trains' in line:
-                    print(f"   {line}")
+            # Extract key information safely
+            try:
+                if result.stdout:
+                    lines = result.stdout.split('\n')
+                    for line in lines:
+                        if any(keyword in line.lower() for keyword in ['successfully added', 'total active trains', 'setup complete']):
+                            print(f"   {line}")
+            except Exception:
+                print("   Train loading completed successfully")
             return True
         else:
             print(f"❌ Train loading failed:")
-            print(result.stderr)
+            if result.stderr:
+                print(result.stderr)
             return False
             
     except subprocess.TimeoutExpired:

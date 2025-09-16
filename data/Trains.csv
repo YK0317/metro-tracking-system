@@ -1,5 +1,5 @@
 train_id,line,direction,capacity,current_load,speed_kmh,status,current_station,latitude,longitude
-1,KJL,forward,300,160,40.0,active,Gombak,3.2647,101.6532
-2,KJL,backward,300,137,40.0,active,Putra Heights (KJL),2.9963,101.5178
-3,SBK,forward,300,130,40.0,active,Sungai Buloh,3.2297,101.5639
-4,SBK,backward,300,118,40.0,active,Kajang,2.9878,101.7901
+1,KJL,forward,300,108,40.0,active,Gombak,3.231128,101.724457
+2,KJL,backward,300,123,40.0,active,Putra Heights (KJL),2.9958,101.5753
+3,SBK,forward,300,62,40.0,active,Sungai Buloh,3.2061,101.5808
+4,SBK,backward,300,59,40.0,active,Kajang,2.982778,101.790278
